@@ -20,5 +20,7 @@ class Communications:
 
     def send_and_receive(self, msg):
         self.s.send(json.dumps(msg).encode())
-        data = json.loads(self.s.recv(BUFFER_SIZE).decode())
-        return data
+        response = self.s.recv(BUFFER_SIZE).decode()
+        if len(response) > 0:
+            return json.loads(response)
+        return None

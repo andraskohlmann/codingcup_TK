@@ -11,9 +11,11 @@ with Communications() as c:
     world = World()
 
     while not should_quit:
-        sleep(1)
+        # sleep(1)
         msg = world.update(data)
 
         data = c.send_and_receive(msg)
+        if data is None:
+            should_quit = True
 
 print('exit')

@@ -88,7 +88,9 @@ class Board:
         pos = car['pos']
         speed = car['speed']
         direction = Directions[car['direction']]
-        command = Commands.NO_OP
+        command = Commands.CLEAR
+        print("Dir: {}, desired {}".format(direction, dir_map[pos['y'], pos['x']]))
+        print("Speed: {}, desired {}".format(speed, speed_map[pos['y'], pos['x']]))
         if 'next_command' in car and car['next_command'] == 'X':
             return command
         if direction != dir_map[pos['y'], pos['x']]:
