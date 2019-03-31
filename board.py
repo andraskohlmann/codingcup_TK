@@ -63,7 +63,7 @@ class Board:
 
 
     def speed_map(self, dir_map):
-        pass
+        return self.drivable_map
 
     def get_indices(self, visited, iter):
         indices = []
