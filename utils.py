@@ -24,6 +24,7 @@ class Directions(Enum):
     DOWN = 'v'
     RIGHT = '>'
     LEFT = '<'
+    NONE = '-'
 
 
 def command(game_id, tick, car_id, cmd: Commands):

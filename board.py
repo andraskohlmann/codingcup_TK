@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import Commands
+from utils import Commands, Directions
 
 
 class Board:
@@ -32,13 +32,34 @@ class Board:
             return None
 
     def direction_map(self, stop_location):
-        pass
+        direction_map = [[Directions.NONE for _ in row] for row in self.default_map]
+
+        visited = np.zeros_like(self.drivable_map)
+        visited[stop_location['y'], stop_location['x']] = 1
+        iter = 1
+        while iter in visited:
+            indices = self.get_indices(visited, iter)
+            for i in indices:
+                self.set_visitors(visited, direction_map, i, iter + 1)
+            iter += 1
+
 
     def strat(self, data: dict, dir_map: np.array, speed_map: np.array) -> Commands:
         pass
 
 
     def speed_map(self, dir_map):
+        pass
+
+    def get_indices(self, visited, iter):
+        indices = []
+        for i, row in enumerate(visited):
+            for j, col in enumerate(row):
+                if col == iter:
+                    indices.append({'x': j, 'y': i})
+        return indices
+
+    def set_visitors(self, visited, direction_map, i, param):
         pass
 
 
