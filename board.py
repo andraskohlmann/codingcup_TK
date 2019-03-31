@@ -3,6 +3,29 @@ import numpy as np
 from utils import Commands, Directions
 
 
+def turn_dir(direction, desired_direction):
+    if desired_direction == Directions.UP:
+        if direction == Directions.RIGHT:
+            return Commands.CAR_INDEX_LEFT
+        else:
+            return Commands.CAR_INDEX_RIGHT
+    elif  desired_direction == Directions.RIGHT:
+        if direction == Directions.DOWN:
+            return Commands.CAR_INDEX_LEFT
+        else:
+            return Commands.CAR_INDEX_RIGHT
+    elif  desired_direction == Directions.LEFT:
+        if direction == Directions.UP:
+            return Commands.CAR_INDEX_LEFT
+        else:
+            return Commands.CAR_INDEX_RIGHT
+    else:
+        if direction == Directions.LEFT:
+            return Commands.CAR_INDEX_LEFT
+        else:
+            return Commands.CAR_INDEX_RIGHT
+
+
 class Board:
     def __init__(self):
         default_map = def_map()
@@ -65,8 +88,17 @@ class Board:
         pos = car['pos']
         speed = car['speed']
         direction = Directions[car['direction']]
-
-
+        command = Commands.NO_OP
+        if 'next_command' in car and car['next_command'] == 'X':
+            return command
+        if direction != dir_map[pos['y'], pos['x']]:
+            command = turn_dir(direction, dir_map[pos['y'], pos['x']])
+        else:
+            if speed < speed_map[pos['y'], pos['x']]:
+                command = Commands.ACCELERATION
+            elif speed > speed_map[pos['y'], pos['x']]:
+                command = Commands.DECELERATION
+        return command
 
     def speed_map(self, dir_map):
         return self.drivable_map
