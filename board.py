@@ -103,7 +103,44 @@ class Board:
         return command
 
     def speed_map(self, dir_map):
-        return self.drivable_map
+        # TODO: optmize and manage borders
+
+        left_map = self.speed_map_in_dir(dir_map, Directions.LEFT)
+        right_map = self.speed_map_in_dir(dir_map, Directions.RIGHT)
+        up_map = self.speed_map_in_dir(dir_map, Directions.UP)
+        down_map = self.speed_map_in_dir(dir_map, Directions.DOWN)
+        speed_map = left_map + right_map + up_map + down_map
+
+        print(dir_map)
+        print(speed_map)
+
+        return speed_map
+
+    def speed_map_in_dir(self, dir_map, direction):
+        dir_speed_map = np.zeros_like(self.drivable_map)
+        max_speed = 1
+
+        for i in range(60):
+            for j in range(60):
+                x, y = self.transform_coord(direction, i, j)
+                if dir_map[x, y] == direction:
+                    dir_speed_map[x, y] = max_speed
+                    max_speed = max_speed + 1 if max_speed < 3 else 3
+                else:
+                    max_speed = 1
+            max_speed = 1
+
+        return dir_speed_map
+
+    def transform_coord(self, direction, x, y):
+        if direction == Directions.LEFT:
+            return x, y
+        if direction == Directions.RIGHT:
+            return x, 59 - y
+        if direction == Directions.UP:
+            return y, x
+        if direction == Directions.DOWN:
+            return 59 - y, x
 
     def get_indices(self, visited, iter):
         indices = []
