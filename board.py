@@ -7,12 +7,14 @@ class Board:
     def __init__(self):
         default_map = def_map()
         self.default_map = np.array([[c for c in _] for _ in default_map])
-        self.drivable_map = np.zeros_like(self.default_map)
-        self.drivable_map[default_map == 'S'] = 1
-        self.drivable_map[default_map == 'Z'] = 1
+        self.drivable_map = np.zeros_like(self.default_map, dtype=int)
+        self.drivable_map[self.default_map == 'S'] = 1
+        self.drivable_map[self.default_map == 'Z'] = 1
+
+        self.size_y, self.size_x = self.drivable_map.shape
 
     def next_command(self, data: dict) -> Commands:
-        passenger_location = data['passengers']['pos']
+        passenger_location = data['passengers'][0]['pos']
         stop_location = self.stop_location(passenger_location)
         dir_map = self.direction_map(stop_location)
         speed_map = self.speed_map(dir_map)
@@ -32,7 +34,7 @@ class Board:
             return None
 
     def direction_map(self, stop_location):
-        direction_map = [[Directions.NONE for _ in row] for row in self.default_map]
+        direction_map = np.array([[Directions.NONE for _ in row] for row in self.default_map])
 
         visited = np.zeros_like(self.drivable_map)
         visited[stop_location['y'], stop_location['x']] = 1
@@ -45,21 +47,25 @@ class Board:
         return direction_map
 
     def set_visitors(self, visited, direction_map, index, param):
-        if self.drivable_map[index['y'] - 1, index['x']] == 1 and visited[index['y'] - 1, index['x']] == 1:
-            visited[index['y'] - 1, index['x']] = param
-            direction_map[index['y'] - 1, index['x']] = Directions.DOWN
-        if self.drivable_map[index['y'], index['x'] - 1] == 1 and visited[index['y'], index['x'] - 1] == 1:
-            visited[index['y'], index['x'] - 1] = param
-            direction_map[index['y'], index['x'] - 1] = Directions.RIGHT
-        if self.drivable_map[index['y'], index['x'] + 1] == 1 and visited[index['y'], index['x'] + 1] == 1:
-            visited[index['y'], index['x'] + 1] = param
-            direction_map[index['y'], index['x'] + 1] = Directions.LEFT
-        if self.drivable_map[index['y'] + 1, index['x']] == 1 and visited[index['y'] + 1, index['x']] == 1:
-            visited[index['y'] + 1, index['x']] = param
-            direction_map[index['y'] + 1, index['x']] = Directions.UP
+        if self.drivable_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
+            visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = param
+            direction_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = Directions.DOWN
+        if self.drivable_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 and visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
+            visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = param
+            direction_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = Directions.RIGHT
+        if self.drivable_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 and visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
+            visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = param
+            direction_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = Directions.LEFT
+        if self.drivable_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
+            visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = param
+            direction_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = Directions.UP
 
     def strat(self, data: dict, dir_map: np.array, speed_map: np.array) -> Commands:
-        pass
+        car = [_ for _ in data['cars'] if _['id'] == 0][0]
+        pos = car['pos']
+        speed = car['speed']
+        direction = Directions[car['direction']]
+
 
 
     def speed_map(self, dir_map):
