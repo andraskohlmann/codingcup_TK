@@ -22,11 +22,11 @@ class Board:
     def stop_location(self, passenger_location):
         if self.drivable_map[passenger_location['y'] - 1, passenger_location['x']] == 1:
             return {'x': passenger_location['x'], 'y': passenger_location['y'] - 1}
-        elif self.drivable_map[passenger_location['y'], passenger_location['x'] - 1] == 1:
+        if self.drivable_map[passenger_location['y'], passenger_location['x'] - 1] == 1:
             return {'x': passenger_location['x'] - 1, 'y': passenger_location['y']}
-        elif self.drivable_map[passenger_location['y'], passenger_location['x'] + 1] == 1:
+        if self.drivable_map[passenger_location['y'], passenger_location['x'] + 1] == 1:
             return {'x': passenger_location['x'] + 1, 'y': passenger_location['y']}
-        elif self.drivable_map[passenger_location['y'] + 1, passenger_location['x']] == 1:
+        if self.drivable_map[passenger_location['y'] + 1, passenger_location['x']] == 1:
             return {'x': passenger_location['x'], 'y': passenger_location['y'] + 1}
         else:
             return None
@@ -42,7 +42,21 @@ class Board:
             for i in indices:
                 self.set_visitors(visited, direction_map, i, iter + 1)
             iter += 1
+        return direction_map
 
+    def set_visitors(self, visited, direction_map, index, param):
+        if self.drivable_map[index['y'] - 1, index['x']] == 1 and visited[index['y'] - 1, index['x']] == 1:
+            visited[index['y'] - 1, index['x']] = param
+            direction_map[index['y'] - 1, index['x']] = Directions.DOWN
+        if self.drivable_map[index['y'], index['x'] - 1] == 1 and visited[index['y'], index['x'] - 1] == 1:
+            visited[index['y'], index['x'] - 1] = param
+            direction_map[index['y'], index['x'] - 1] = Directions.RIGHT
+        if self.drivable_map[index['y'], index['x'] + 1] == 1 and visited[index['y'], index['x'] + 1] == 1:
+            visited[index['y'], index['x'] + 1] = param
+            direction_map[index['y'], index['x'] + 1] = Directions.LEFT
+        if self.drivable_map[index['y'] + 1, index['x']] == 1 and visited[index['y'] + 1, index['x']] == 1:
+            visited[index['y'] + 1, index['x']] = param
+            direction_map[index['y'] + 1, index['x']] = Directions.UP
 
     def strat(self, data: dict, dir_map: np.array, speed_map: np.array) -> Commands:
         pass
@@ -58,9 +72,6 @@ class Board:
                 if col == iter:
                     indices.append({'x': j, 'y': i})
         return indices
-
-    def set_visitors(self, visited, direction_map, i, param):
-        pass
 
 
 def def_map():
