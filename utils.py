@@ -19,6 +19,16 @@ class Commands(Enum):
     GO_RIGHT = "GO_RIGHT"
 
 
+str_to_cmd = {
+    '0': Commands.NO_OP,
+    '+': Commands.ACCELERATION,
+    '-': Commands.DECELERATION,
+    '<': Commands.CAR_INDEX_LEFT,
+    '>': Commands.CAR_INDEX_RIGHT
+}
+
+
+
 class Directions(Enum):
     UP = '^'
     DOWN = 'v'

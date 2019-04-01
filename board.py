@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import Commands, Directions
+from utils import Commands, Directions, str_to_cmd
 
 
 def turn_dir(direction, desired_direction):
@@ -26,6 +26,22 @@ def turn_dir(direction, desired_direction):
             return Commands.CAR_INDEX_RIGHT
 
 
+def look_ahead(lookup_map, pos, direction, speed):
+    if direction == Directions.UP:
+        v_x = 0
+        v_y = -speed
+    elif direction == Directions.DOWN:
+        v_x = 0
+        v_y = speed
+    elif direction == Directions.LEFT:
+        v_x = -speed
+        v_y = 0
+    elif direction == Directions.RIGHT:
+        v_x = speed
+        v_y = 0
+    return lookup_map[(pos['y'] + v_y) % 60, (pos['x'] + v_x) % 60]
+
+
 class Board:
     def __init__(self):
         default_map = def_map()
@@ -37,10 +53,13 @@ class Board:
         self.size_y, self.size_x = self.drivable_map.shape
 
     def next_command(self, data: dict) -> Commands:
-        passenger_location = data['passengers'][0]['pos']
+        if 'passenger_id' in data['cars'][0]:
+            passenger_location = [_ for _ in data['passengers'] if _['id'] == data['cars'][0]['passenger_id']][0]['dest_pos']
+        else:
+            passenger_location = data['passengers'][0]['pos']
         stop_location = self.stop_location(passenger_location)
         dir_map = self.direction_map(stop_location)
-        speed_map = self.speed_map(dir_map)
+        speed_map = self.speed_map(dir_map, stop_location)
         command = self.strat(data, dir_map, speed_map)
         return command
 
@@ -88,21 +107,46 @@ class Board:
         pos = car['pos']
         speed = car['speed']
         direction = Directions[car['direction']]
-        command = Commands.CLEAR
-        print("Dir: {}, desired {}".format(direction, dir_map[pos['y'], pos['x']]))
-        print("Speed: {}, desired {}".format(speed, speed_map[pos['y'], pos['x']]))
-        if 'next_command' in car and car['next_command'] == 'X':
-            return command
-        if direction != dir_map[pos['y'], pos['x']]:
-            command = turn_dir(direction, dir_map[pos['y'], pos['x']])
-        else:
-            if speed < speed_map[pos['y'], pos['x']]:
-                command = Commands.ACCELERATION
-            elif speed > speed_map[pos['y'], pos['x']]:
-                command = Commands.DECELERATION
+        command = Commands.NO_OP
+        prev_command = Commands.NO_OP
+        if 'command' in car:
+            if car['command'] == 'X':
+                return Commands.NO_OP
+            prev_command = str_to_cmd[car['command']]
+        if direction != dir_map[pos['y'], pos['x']] and speed > 0\
+                and prev_command != Commands.CAR_INDEX_RIGHT\
+                and prev_command != Commands.CAR_INDEX_LEFT:
+            return Commands.EMERGENCY_BRAKE
+        desired_dir = look_ahead(dir_map, pos, direction, speed)
+        desired_speed = look_ahead(speed_map, pos, direction, speed)
+
+        if desired_dir == Directions.NONE:
+            print('NONE as desired')
+            return Commands.EMERGENCY_BRAKE
+
+        print("Dir: {}, desired {}".format(direction, desired_dir))
+        print("Speed: {}, desired {}".format(speed, desired_speed))
+
+        if desired_speed < speed and desired_dir == direction:
+            if prev_command != Commands.DECELERATION:
+                return Commands.DECELERATION
+            else:
+                return Commands.NO_OP
+        if desired_speed > speed and desired_dir == direction:
+            if prev_command != Commands.ACCELERATION:
+                return Commands.ACCELERATION
+            else:
+                return Commands.NO_OP
+        if desired_dir != direction:
+            if speed == 0 and prev_command != Commands.CAR_INDEX_LEFT and prev_command != Commands.CAR_INDEX_RIGHT:
+                print(command)
+                return turn_dir(direction, desired_dir)
+            else:
+                if prev_command != Commands.CAR_INDEX_LEFT and prev_command != Commands.CAR_INDEX_RIGHT:
+                    return turn_dir(direction, desired_dir)
         return command
 
-    def speed_map(self, dir_map):
+    def speed_map(self, dir_map, stop_pos):
         # TODO: optmize and manage borders
 
         left_map = self.speed_map_in_dir(dir_map, Directions.LEFT)
@@ -111,9 +155,10 @@ class Board:
         down_map = self.speed_map_in_dir(dir_map, Directions.DOWN)
         speed_map = left_map + right_map + up_map + down_map
 
-        print(dir_map)
-        print(speed_map)
-
+        # print(dir_map)
+        # print(speed_map)
+        speed_map = self.drivable_map.copy()
+        speed_map[stop_pos['y'], stop_pos['x']] = 0
         return speed_map
 
     def speed_map_in_dir(self, dir_map, direction):
