@@ -9,12 +9,12 @@ def turn_dir(direction, desired_direction):
             return Commands.CAR_INDEX_LEFT
         else:
             return Commands.CAR_INDEX_RIGHT
-    elif  desired_direction == Directions.RIGHT:
+    elif desired_direction == Directions.RIGHT:
         if direction == Directions.DOWN:
             return Commands.CAR_INDEX_LEFT
         else:
             return Commands.CAR_INDEX_RIGHT
-    elif  desired_direction == Directions.LEFT:
+    elif desired_direction == Directions.LEFT:
         if direction == Directions.UP:
             return Commands.CAR_INDEX_LEFT
         else:
@@ -26,20 +26,73 @@ def turn_dir(direction, desired_direction):
             return Commands.CAR_INDEX_RIGHT
 
 
-def look_ahead(lookup_map, pos, direction, speed):
+def resulting_dir(direction, prev_command):
     if direction == Directions.UP:
-        v_x = 0
+        if prev_command == Commands.CAR_INDEX_RIGHT:
+            return Directions.RIGHT
+        else:
+            return Directions.LEFT
+    elif direction == Directions.RIGHT:
+        if prev_command == Commands.CAR_INDEX_RIGHT:
+            return Directions.DOWN
+        else:
+            return Directions.UP
+    elif direction == Directions.LEFT:
+        if prev_command == Commands.CAR_INDEX_RIGHT:
+            return Directions.UP
+        else:
+            return Directions.DOWN
+    else:
+        if prev_command == Commands.CAR_INDEX_RIGHT:
+            return Directions.LEFT
+        else:
+            return Directions.RIGHT
+
+
+def look_ahead(pos, direction, speed, prev_command):
+    v_x = 0
+    v_y = 0
+
+    if direction == Directions.UP:
         v_y = -speed
     elif direction == Directions.DOWN:
-        v_x = 0
         v_y = speed
     elif direction == Directions.LEFT:
         v_x = -speed
-        v_y = 0
     elif direction == Directions.RIGHT:
         v_x = speed
-        v_y = 0
-    return lookup_map[(pos['y'] + v_y) % 60, (pos['x'] + v_x) % 60]
+
+    new_pos = {'x': (pos['x'] + v_x) % 60, 'y': (pos['y'] + v_y) % 60}
+
+    new_speed = speed
+    if prev_command == Commands.DECELERATION:
+        new_speed = max(0, speed - 1)
+    elif prev_command == Commands.ACCELERATION:
+        new_speed = min(speed + 1, 3)
+
+    new_dir = direction
+    if prev_command == Commands.CAR_INDEX_LEFT or prev_command == Commands.CAR_INDEX_RIGHT:
+        new_dir = resulting_dir(direction, prev_command)
+
+    return new_pos, new_dir, new_speed
+
+
+def look_way_ahead(pos, direction, speed):
+    v_x = 0
+    v_y = 0
+
+    if direction == Directions.UP:
+        v_y = -speed
+    elif direction == Directions.DOWN:
+        v_y = speed
+    elif direction == Directions.LEFT:
+        v_x = -speed
+    elif direction == Directions.RIGHT:
+        v_x = speed
+
+    new_pos = {'x': (pos['x'] + v_x) % 60, 'y': (pos['y'] + v_y) % 60}
+
+    return new_pos
 
 
 class Board:
@@ -54,7 +107,8 @@ class Board:
 
     def next_command(self, data: dict) -> Commands:
         if 'passenger_id' in data['cars'][0]:
-            passenger_location = [_ for _ in data['passengers'] if _['id'] == data['cars'][0]['passenger_id']][0]['dest_pos']
+            passenger_location = [_ for _ in data['passengers'] if _['id'] == data['cars'][0]['passenger_id']][0][
+                'dest_pos']
         else:
             passenger_location = data['passengers'][0]['pos']
         stop_location = self.stop_location(passenger_location)
@@ -73,6 +127,22 @@ class Board:
         if self.drivable_map[passenger_location['y'] + 1, passenger_location['x']] == 1:
             return {'x': passenger_location['x'], 'y': passenger_location['y'] + 1}
         else:
+            if self.default_map[passenger_location['y'] - 1, passenger_location['x']] == 'P':
+                self.default_map[passenger_location['y'] - 1, passenger_location['x']] = 'S'
+                self.drivable_map[passenger_location['y'] - 1, passenger_location['x']] = 1
+                return {'x': passenger_location['x'], 'y': passenger_location['y'] - 1}
+            if self.default_map[passenger_location['y'], passenger_location['x'] - 1] == 'P':
+                self.default_map[passenger_location['y'], passenger_location['x'] - 1] = 'S'
+                self.drivable_map[passenger_location['y'], passenger_location['x'] - 1] = 1
+                return {'x': passenger_location['x'] - 1, 'y': passenger_location['y']}
+            if self.default_map[passenger_location['y'], passenger_location['x'] + 1] == 'P':
+                self.default_map[passenger_location['y'], passenger_location['x'] + 1] = 'S'
+                self.drivable_map[passenger_location['y'], passenger_location['x'] + 1] = 1
+                return {'x': passenger_location['x'] + 1, 'y': passenger_location['y']}
+            if self.default_map[passenger_location['y'] + 1, passenger_location['x']] == 'P':
+                self.default_map[passenger_location['y'] + 1, passenger_location['x']] = 'S'
+                self.drivable_map[passenger_location['y'] + 1, passenger_location['x']] = 1
+                return {'x': passenger_location['x'], 'y': passenger_location['y'] + 1}
             return None
 
     def direction_map(self, stop_location):
@@ -89,16 +159,20 @@ class Board:
         return direction_map
 
     def set_visitors(self, visited, direction_map, index, param):
-        if self.drivable_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
+        if self.drivable_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[
+            (index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
             visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = param
             direction_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = Directions.DOWN
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 and visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
+        if self.drivable_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 and visited[
+            (index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
             visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = param
             direction_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = Directions.RIGHT
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 and visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
+        if self.drivable_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 and visited[
+            (index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
             visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = param
             direction_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = Directions.LEFT
-        if self.drivable_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
+        if self.drivable_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[
+            (index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
             visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = param
             direction_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = Directions.UP
 
@@ -113,37 +187,30 @@ class Board:
             if car['command'] == 'X':
                 return Commands.NO_OP
             prev_command = str_to_cmd[car['command']]
-        if direction != dir_map[pos['y'], pos['x']] and speed > 0\
-                and prev_command != Commands.CAR_INDEX_RIGHT\
-                and prev_command != Commands.CAR_INDEX_LEFT:
-            return Commands.EMERGENCY_BRAKE
-        desired_dir = look_ahead(dir_map, pos, direction, speed)
-        desired_speed = look_ahead(speed_map, pos, direction, speed)
 
-        if desired_dir == Directions.NONE:
-            print('NONE as desired')
-            return Commands.EMERGENCY_BRAKE
+        new_pos, new_dir, new_speed = look_ahead(pos, direction, speed, prev_command)
+        newest_pos = look_way_ahead(new_pos, new_dir, new_speed)
+
+        desired_dir = dir_map[newest_pos['y'], newest_pos['x']]
+        desired_speed = speed_map[newest_pos['y'], newest_pos['x']]
 
         print("Dir: {}, desired {}".format(direction, desired_dir))
         print("Speed: {}, desired {}".format(speed, desired_speed))
 
-        if desired_speed < speed and desired_dir == direction:
-            if prev_command != Commands.DECELERATION:
-                return Commands.DECELERATION
+        if desired_speed == 0:
+            command = Commands.DECELERATION
+        else:
+            if desired_dir == new_dir:
+                if speed == 0 and prev_command != Commands.ACCELERATION:
+                    command = Commands.ACCELERATION
+                else:
+                    command = Commands.NO_OP
             else:
-                return Commands.NO_OP
-        if desired_speed > speed and desired_dir == direction:
-            if prev_command != Commands.ACCELERATION:
-                return Commands.ACCELERATION
-            else:
-                return Commands.NO_OP
-        if desired_dir != direction:
-            if speed == 0 and prev_command != Commands.CAR_INDEX_LEFT and prev_command != Commands.CAR_INDEX_RIGHT:
-                print(command)
-                return turn_dir(direction, desired_dir)
-            else:
-                if prev_command != Commands.CAR_INDEX_LEFT and prev_command != Commands.CAR_INDEX_RIGHT:
-                    return turn_dir(direction, desired_dir)
+                command = turn_dir(new_dir, desired_dir)
+
+        if self.default_map[newest_pos['y'], newest_pos['x']] == 'P':
+            command = Commands.EMERGENCY_BRAKE
+
         return command
 
     def speed_map(self, dir_map, stop_pos):
