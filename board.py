@@ -108,8 +108,9 @@ class Board:
         self.possible_directions = self.set_possible_directions()
 
     def next_command(self, data: dict) -> Commands:
-        if 'passenger_id' in data['cars'][0]:
-            passenger_location = [_ for _ in data['passengers'] if _['id'] == data['cars'][0]['passenger_id']][0][
+        our_car = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']][0]
+        if 'passenger_id' in our_car:
+            passenger_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0][
                 'dest_pos']
         else:
             passenger_location = data['passengers'][0]['pos']
