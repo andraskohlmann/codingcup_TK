@@ -147,7 +147,8 @@ class Board:
                 for nb_nb_dir in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
                     nb_nb_pos = look_way_ahead(nb_pos, nb_nb_dir)
                     if self.default_map[nb_nb_pos['y'], nb_nb_pos['x']] == 'S':
-                        self.add_posible_direction(nb_nb_pos, opposite_dir(nb_nb_dir))
+                        # self.add_posible_direction(nb_nb_pos, opposite_dir(nb_nb_dir))
+                        self.add_posible_direction(nb_pos, nb_nb_dir)
                 return nb_pos
         return None
 
@@ -191,7 +192,8 @@ class Board:
         desired_dir = dir_map[newest_pos['y'], newest_pos['x']]
         desired_speed = speed_map[newest_pos['y'], newest_pos['x']]
 
-        print("Dir: {}, desired {}".format(direction, desired_dir))
+        print("Pos: {}, new pos {}, newest {}".format(pos, new_pos, newest_pos))
+        print("Dir: {}, new dir {}, desired {}".format(direction, new_dir, desired_dir))
         print("Speed: {}, desired {}".format(speed, desired_speed))
         print("Life: {}".format(data['cars'][0]['life']))
 
@@ -206,7 +208,7 @@ class Board:
             else:
                 command = turn_dir(new_dir, desired_dir)
 
-        if self.default_map[newest_pos['y'], newest_pos['x']] == 'P':
+        if self.default_map[newest_pos['y'], newest_pos['x']] in ['P', 'B']:
             command = Commands.EMERGENCY_BRAKE
 
         return command
