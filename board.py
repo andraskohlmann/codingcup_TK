@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import Commands, Directions, str_to_cmd
+from utils import Commands, Directions, str_to_cmd, c
 
 
 def turn_dir(direction, desired_direction):
@@ -77,7 +77,7 @@ def look_ahead(pos, direction, speed, prev_command):
     return new_pos, new_dir, new_speed
 
 
-def look_way_ahead(pos, direction, speed):
+def look_way_ahead(pos, direction, speed=1):
     v_x = 0
     v_y = 0
 
@@ -104,6 +104,8 @@ class Board:
         self.drivable_map[self.default_map == 'Z'] = 1
 
         self.size_y, self.size_x = self.drivable_map.shape
+
+        self.possible_directions = self.set_possible_directions()
 
     def next_command(self, data: dict) -> Commands:
         if 'passenger_id' in data['cars'][0]:
@@ -147,7 +149,6 @@ class Board:
 
     def direction_map(self, stop_location):
         direction_map = np.array([[Directions.NONE for _ in row] for row in self.default_map])
-        # possible_directions = self.possible_directions(self.default_map)
         visited = np.zeros_like(self.drivable_map)
         visited[stop_location['y'], stop_location['x']] = 1
         iter = 1
@@ -159,22 +160,18 @@ class Board:
         return direction_map
 
     def set_visitors(self, visited, direction_map, index, param):
-        if self.drivable_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 \
-                and visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
-            visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = param
-            direction_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = Directions.DOWN
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 \
-                and visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
-            visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = param
-            direction_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = Directions.RIGHT
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 \
-                and visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
-            visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = param
-            direction_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = Directions.LEFT
-        if self.drivable_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 \
-                and visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
-            visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = param
-            direction_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = Directions.UP
+        for visit_dir in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
+            next_pos = look_way_ahead(index, visit_dir)
+            if self.drivable_map[next_pos['y'], next_pos['x']] == 1 \
+                    and visited[next_pos['y'], next_pos['x']] < 1:
+                desired_dir = resulting_dir(
+                    resulting_dir(
+                        visit_dir, Commands.CAR_INDEX_LEFT
+                    ), Commands.CAR_INDEX_LEFT
+                )
+                if desired_dir in self.possible_directions[next_pos['y'], next_pos['x']]:
+                    visited[next_pos['y'], next_pos['x']] = param
+                    direction_map[next_pos['y'], next_pos['x']] = desired_dir
 
     def strat(self, data: dict, dir_map: np.array, speed_map: np.array) -> Commands:
         car = [_ for _ in data['cars'] if _['id'] == 0][0]
@@ -262,16 +259,53 @@ class Board:
                     indices.append({'x': j, 'y': i})
         return indices
 
-    def possible_directions(self, default_map):
+    def set_possible_directions(self):
         go = True
         circulated = np.array([[False for _ in row] for row in self.default_map])
-        possible_dirs = [[[] for _ in row] for row in self.default_map]
+        possible_dirs = np.array([[[None, None] for _ in row] for row in self.default_map])
         while go:
-            candidate, start_dir = self.get_unvisited_road(default_map, circulated)
+            candidate, start_dir = self.get_unvisited_road(circulated)
+            if candidate is None: go = False
+            else:
+                self.circulate(candidate, start_dir, circulated, possible_dirs)
+        return possible_dirs
 
-    def get_unvisited_road(self):
-
+    def get_unvisited_road(self, circulated):
+        for y in range(len(self.default_map)):
+            for x in range(len(self.default_map[y])):
+                if self.default_map[y][x] == 'S' and not circulated[y][x]:
+                    if self.default_map[c(y + 1)][c(x)] == 'P' \
+                            and self.default_map[c(y - 1)][c(x)] == 'S' \
+                            and self.default_map[c(y - 2)][c(x)] == 'P':
+                        return {'x': x, 'y': y}, Directions.RIGHT
+                    elif self.default_map[c(y - 1)][c(x)] == 'P' \
+                            and self.default_map[c(y + 1)][c(x)] == 'S' \
+                            and self.default_map[c(y + 2)][c(x)] == 'P':
+                        return {'x': x, 'y': y}, Directions.LEFT
+                    elif self.default_map[c(y)][c(x + 1)] == 'P' \
+                            and self.default_map[c(y)][c(x - 1)] == 'S' \
+                            and self.default_map[c(y)][c(x - 2)] == 'P':
+                        return {'x': x, 'y': y}, Directions.UP
+                    elif self.default_map[c(y)][c(x - 1)] == 'P' \
+                            and self.default_map[c(y)][c(x + 1)] == 'S' \
+                            and self.default_map[c(y)][c(x + 2)] == 'P':
+                        return {'x': x, 'y': y}, Directions.DOWN
         return None, None
+
+    def circulate(self, candidate, start_dir, circulated, possible_dirs):
+        right_nb = look_way_ahead(candidate, resulting_dir(start_dir, Commands.CAR_INDEX_RIGHT))
+        front_nb = look_way_ahead(candidate, start_dir)
+        if self.default_map[right_nb['y']][right_nb['x']] != 'P':
+            main_dir = resulting_dir(start_dir, Commands.CAR_INDEX_RIGHT)
+        elif self.default_map[front_nb['y']][front_nb['x']] == 'P':
+            main_dir = resulting_dir(start_dir, Commands.CAR_INDEX_LEFT)
+        else:
+            main_dir = start_dir
+        circulated[candidate['y']][candidate['x']] = True
+        possible_dirs[candidate['y'], candidate['x']] = [main_dir, resulting_dir(main_dir, Commands.CAR_INDEX_LEFT)]
+        next_candidate = look_way_ahead(candidate, main_dir)
+        if not circulated[next_candidate['y']][next_candidate['x']]:
+            self.circulate(next_candidate, main_dir, circulated, possible_dirs)
 
 
 def def_map():
