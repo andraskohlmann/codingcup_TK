@@ -21,6 +21,7 @@ class Commands(Enum):
 
 str_to_cmd = {
     '0': Commands.NO_OP,
+    'X': Commands.NO_OP,
     '+': Commands.ACCELERATION,
     '-': Commands.DECELERATION,
     '<': Commands.CAR_INDEX_LEFT,

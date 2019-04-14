@@ -112,7 +112,8 @@ class Board:
         else:
             passenger_location = data['passengers'][0]['pos']
         stop_location = self.stop_location(passenger_location)
-        dir_map = self.direction_map(stop_location)
+        drivable_map_with_cars = self.drivable_map_with_cars(data['cars'], data['request_id']['car_id'])
+        dir_map = self.direction_map(drivable_map_with_cars, stop_location)
         speed_map = self.speed_map(dir_map, stop_location)
         command = self.strat(data, dir_map, speed_map)
         return command
@@ -145,33 +146,33 @@ class Board:
                 return {'x': passenger_location['x'], 'y': passenger_location['y'] + 1}
             return None
 
-    def direction_map(self, stop_location):
+    def direction_map(self, drivable_map_with_cars, stop_location):
         direction_map = np.array([[Directions.NONE for _ in row] for row in self.default_map])
         # possible_directions = self.possible_directions(self.default_map)
-        visited = np.zeros_like(self.drivable_map)
+        visited = np.zeros_like(drivable_map_with_cars)
         visited[stop_location['y'], stop_location['x']] = 1
         iter = 1
         while iter in visited:
             indices = self.get_indices(visited, iter)
             for i in indices:
-                self.set_visitors(visited, direction_map, i, iter + 1)
+                self.set_visitors(drivable_map_with_cars, visited, direction_map, i, iter + 1)
             iter += 1
         return direction_map
 
-    def set_visitors(self, visited, direction_map, index, param):
-        if self.drivable_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 \
+    def set_visitors(self, drivable_map_with_cars, visited, direction_map, index, param):
+        if drivable_map_with_cars[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 \
                 and visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
             visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = param
             direction_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = Directions.DOWN
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 \
+        if drivable_map_with_cars[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 \
                 and visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
             visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = param
             direction_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = Directions.RIGHT
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 \
+        if drivable_map_with_cars[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 \
                 and visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
             visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = param
             direction_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = Directions.LEFT
-        if self.drivable_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 \
+        if drivable_map_with_cars[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 \
                 and visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
             visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = param
             direction_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = Directions.UP
@@ -196,6 +197,7 @@ class Board:
 
         print("Dir: {}, desired {}".format(direction, desired_dir))
         print("Speed: {}, desired {}".format(speed, desired_speed))
+        print("Life: {}".format(data['cars'][0]['life']))
 
         if desired_speed == 0:
             command = Commands.DECELERATION
@@ -272,6 +274,33 @@ class Board:
     def get_unvisited_road(self):
 
         return None, None
+
+    def drivable_map_with_cars(self, cars, car_id):
+        drivable_map_with_cars = np.copy(self.drivable_map)
+        for car in cars:
+            if car['id'] is not car_id:
+                future_car_pos, future_car_dir, future_car_speed = look_ahead(car['pos'], Directions[car['direction']],
+                                                                              car['speed'], str_to_cmd[car['command']])
+                very_future_car_pos = look_way_ahead(future_car_pos, future_car_dir, future_car_speed)
+                positions = self.get_positions_between(future_car_pos, very_future_car_pos)
+                for pos in positions:
+                    drivable_map_with_cars[pos['y']][pos['x']] = 0
+        return drivable_map_with_cars
+
+    def get_positions_between(self, pos, new_pos):
+        if pos == new_pos:
+            return [pos]
+
+        positions = [pos]
+        if pos['x'] == new_pos['x']:
+            ys = range(new_pos['y'], pos['y'], 1 if new_pos['y'] < pos['y'] else -1)
+            for y in ys:
+                positions.append({'x': pos['x'], 'y': y})
+        else:
+            xs = range(new_pos['x'], pos['x'], 1 if new_pos['x'] < pos['x'] else -1)
+            for x in xs:
+                positions.append({'x': x, 'y': pos['y']})
+        return positions
 
 
 def def_map():
