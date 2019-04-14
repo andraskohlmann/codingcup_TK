@@ -123,11 +123,11 @@ class Board:
         else:
             passenger_location = data['passengers'][0]['pos']
         stop_location = self.stop_location(passenger_location)
-        dir_map, visited = self.direction_map(stop_location)
-        if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
-            and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
-            print(visited)
         drivable_map_with_cars = self.drivable_map_with_cars(data['cars'], data['request_id']['car_id'])
+        dir_map, visited = self.direction_map(drivable_map_with_cars, stop_location)
+        if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
+                and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
+            print(visited)
         speed_map = self.speed_map(dir_map, stop_location)
         command = self.strat(data, dir_map, speed_map)
         return command
@@ -266,7 +266,8 @@ class Board:
         possible_dirs = np.array([[[Directions.NONE] * 4 for _ in row] for row in self.default_map])
         while go:
             candidate, start_dir = self.get_unvisited_road(circulated)
-            if candidate is None: go = False
+            if candidate is None:
+                go = False
             else:
                 self.circulate(candidate, start_dir, circulated, possible_dirs)
         return possible_dirs
