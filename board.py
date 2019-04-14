@@ -159,20 +159,20 @@ class Board:
         return direction_map
 
     def set_visitors(self, visited, direction_map, index, param):
-        if self.drivable_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[
-            (index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
+        if self.drivable_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 \
+                and visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
             visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = param
             direction_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = Directions.DOWN
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 and visited[
-            (index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
+        if self.drivable_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 \
+                and visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
             visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = param
             direction_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = Directions.RIGHT
-        if self.drivable_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 and visited[
-            (index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
+        if self.drivable_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 \
+                and visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
             visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = param
             direction_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = Directions.LEFT
-        if self.drivable_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 and visited[
-            (index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
+        if self.drivable_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 \
+                and visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
             visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = param
             direction_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = Directions.UP
 
