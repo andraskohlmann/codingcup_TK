@@ -147,7 +147,7 @@ class Board:
 
     def direction_map(self, stop_location):
         direction_map = np.array([[Directions.NONE for _ in row] for row in self.default_map])
-
+        # possible_directions = self.possible_directions(self.default_map)
         visited = np.zeros_like(self.drivable_map)
         visited[stop_location['y'], stop_location['x']] = 1
         iter = 1
@@ -261,6 +261,17 @@ class Board:
                 if col == iter:
                     indices.append({'x': j, 'y': i})
         return indices
+
+    def possible_directions(self, default_map):
+        go = True
+        circulated = np.array([[False for _ in row] for row in self.default_map])
+        possible_dirs = [[[] for _ in row] for row in self.default_map]
+        while go:
+            candidate, start_dir = self.get_unvisited_road(default_map, circulated)
+
+    def get_unvisited_road(self):
+
+        return None, None
 
 
 def def_map():
