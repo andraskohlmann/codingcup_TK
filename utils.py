@@ -48,3 +48,7 @@ def command(game_id, tick, car_id, cmd: Commands):
       "command": cmd.value
     }
     return msg
+
+
+def c(i, delim=60):
+    return i % delim

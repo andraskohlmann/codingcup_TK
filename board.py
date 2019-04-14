@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import Commands, Directions, str_to_cmd
+from utils import Commands, Directions, str_to_cmd, c
 
 
 def turn_dir(direction, desired_direction):
@@ -77,7 +77,7 @@ def look_ahead(pos, direction, speed, prev_command):
     return new_pos, new_dir, new_speed
 
 
-def look_way_ahead(pos, direction, speed):
+def look_way_ahead(pos, direction, speed=1):
     v_x = 0
     v_y = 0
 
@@ -95,6 +95,14 @@ def look_way_ahead(pos, direction, speed):
     return new_pos
 
 
+def opposite_dir(direction):
+    return resulting_dir(
+        resulting_dir(
+            direction, Commands.CAR_INDEX_LEFT
+        ), Commands.CAR_INDEX_LEFT
+    )
+
+
 class Board:
     def __init__(self):
         default_map = def_map()
@@ -105,50 +113,46 @@ class Board:
 
         self.size_y, self.size_x = self.drivable_map.shape
 
+        self.possible_directions = self.set_possible_directions()
+
     def next_command(self, data: dict) -> Commands:
-        if 'passenger_id' in data['cars'][0]:
-            passenger_location = [_ for _ in data['passengers'] if _['id'] == data['cars'][0]['passenger_id']][0][
+        our_car = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']][0]
+        if 'passenger_id' in our_car:
+            passenger_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0][
                 'dest_pos']
         else:
             passenger_location = data['passengers'][0]['pos']
         stop_location = self.stop_location(passenger_location)
+        dir_map, visited = self.direction_map(stop_location)
+        if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
+            and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
+            print(visited)
         drivable_map_with_cars = self.drivable_map_with_cars(data['cars'], data['request_id']['car_id'])
-        dir_map = self.direction_map(drivable_map_with_cars, stop_location)
         speed_map = self.speed_map(dir_map, stop_location)
         command = self.strat(data, dir_map, speed_map)
         return command
 
     def stop_location(self, passenger_location):
-        if self.drivable_map[passenger_location['y'] - 1, passenger_location['x']] == 1:
-            return {'x': passenger_location['x'], 'y': passenger_location['y'] - 1}
-        if self.drivable_map[passenger_location['y'], passenger_location['x'] - 1] == 1:
-            return {'x': passenger_location['x'] - 1, 'y': passenger_location['y']}
-        if self.drivable_map[passenger_location['y'], passenger_location['x'] + 1] == 1:
-            return {'x': passenger_location['x'] + 1, 'y': passenger_location['y']}
-        if self.drivable_map[passenger_location['y'] + 1, passenger_location['x']] == 1:
-            return {'x': passenger_location['x'], 'y': passenger_location['y'] + 1}
-        else:
-            if self.default_map[passenger_location['y'] - 1, passenger_location['x']] == 'P':
-                self.default_map[passenger_location['y'] - 1, passenger_location['x']] = 'S'
-                self.drivable_map[passenger_location['y'] - 1, passenger_location['x']] = 1
-                return {'x': passenger_location['x'], 'y': passenger_location['y'] - 1}
-            if self.default_map[passenger_location['y'], passenger_location['x'] - 1] == 'P':
-                self.default_map[passenger_location['y'], passenger_location['x'] - 1] = 'S'
-                self.drivable_map[passenger_location['y'], passenger_location['x'] - 1] = 1
-                return {'x': passenger_location['x'] - 1, 'y': passenger_location['y']}
-            if self.default_map[passenger_location['y'], passenger_location['x'] + 1] == 'P':
-                self.default_map[passenger_location['y'], passenger_location['x'] + 1] = 'S'
-                self.drivable_map[passenger_location['y'], passenger_location['x'] + 1] = 1
-                return {'x': passenger_location['x'] + 1, 'y': passenger_location['y']}
-            if self.default_map[passenger_location['y'] + 1, passenger_location['x']] == 'P':
-                self.default_map[passenger_location['y'] + 1, passenger_location['x']] = 'S'
-                self.drivable_map[passenger_location['y'] + 1, passenger_location['x']] = 1
-                return {'x': passenger_location['x'], 'y': passenger_location['y'] + 1}
-            return None
+        # Normal case, stop location is next to the road
+        for nb_dir in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
+            nb_pos = look_way_ahead(passenger_location, nb_dir)
+            if self.drivable_map[nb_pos['y'], nb_pos['x']] == 1:
+                return nb_pos
+        # Special case, need to extend the drivable area
+        for nb_dir in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
+            nb_pos = look_way_ahead(passenger_location, nb_dir)
+            if self.default_map[nb_pos['y'], nb_pos['x']] == 'P':
+                self.default_map[nb_pos['y'], nb_pos['x']] = 'S'
+                self.drivable_map[nb_pos['y'], nb_pos['x']] = 1
+                for nb_nb_dir in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
+                    nb_nb_pos = look_way_ahead(nb_pos, nb_nb_dir)
+                    if self.default_map[nb_nb_pos['y'], nb_nb_pos['x']] == 'S':
+                        self.add_posible_direction(nb_nb_pos, opposite_dir(nb_nb_dir))
+                return nb_pos
+        return None
 
     def direction_map(self, drivable_map_with_cars, stop_location):
         direction_map = np.array([[Directions.NONE for _ in row] for row in self.default_map])
-        # possible_directions = self.possible_directions(self.default_map)
         visited = np.zeros_like(drivable_map_with_cars)
         visited[stop_location['y'], stop_location['x']] = 1
         iter = 1
@@ -157,25 +161,17 @@ class Board:
             for i in indices:
                 self.set_visitors(drivable_map_with_cars, visited, direction_map, i, iter + 1)
             iter += 1
-        return direction_map
+        return direction_map, visited
 
     def set_visitors(self, drivable_map_with_cars, visited, direction_map, index, param):
-        if drivable_map_with_cars[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] == 1 \
-                and visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] < 1:
-            visited[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = param
-            direction_map[(index['y'] - 1) % self.size_y, (index['x']) % self.size_x] = Directions.DOWN
-        if drivable_map_with_cars[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] == 1 \
-                and visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] < 1:
-            visited[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = param
-            direction_map[(index['y']) % self.size_y, (index['x'] - 1) % self.size_x] = Directions.RIGHT
-        if drivable_map_with_cars[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] == 1 \
-                and visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] < 1:
-            visited[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = param
-            direction_map[(index['y']) % self.size_y, (index['x'] + 1) % self.size_x] = Directions.LEFT
-        if drivable_map_with_cars[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] == 1 \
-                and visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] < 1:
-            visited[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = param
-            direction_map[(index['y'] + 1) % self.size_y, (index['x']) % self.size_x] = Directions.UP
+        for visit_dir in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
+            next_pos = look_way_ahead(index, visit_dir)
+            if drivable_map_with_cars[next_pos['y'], next_pos['x']] == 1 \
+                    and visited[next_pos['y'], next_pos['x']] < 1:
+                desired_dir = opposite_dir(visit_dir)
+                if desired_dir in self.possible_directions[next_pos['y'], next_pos['x']]:
+                    visited[next_pos['y'], next_pos['x']] = param
+                    direction_map[next_pos['y'], next_pos['x']] = desired_dir
 
     def strat(self, data: dict, dir_map: np.array, speed_map: np.array) -> Commands:
         car = [_ for _ in data['cars'] if _['id'] == 0][0]
@@ -264,16 +260,61 @@ class Board:
                     indices.append({'x': j, 'y': i})
         return indices
 
-    def possible_directions(self, default_map):
+    def set_possible_directions(self):
         go = True
         circulated = np.array([[False for _ in row] for row in self.default_map])
-        possible_dirs = [[[] for _ in row] for row in self.default_map]
+        possible_dirs = np.array([[[Directions.NONE] * 4 for _ in row] for row in self.default_map])
         while go:
-            candidate, start_dir = self.get_unvisited_road(default_map, circulated)
+            candidate, start_dir = self.get_unvisited_road(circulated)
+            if candidate is None: go = False
+            else:
+                self.circulate(candidate, start_dir, circulated, possible_dirs)
+        return possible_dirs
 
-    def get_unvisited_road(self):
-
+    def get_unvisited_road(self, circulated):
+        for y in range(len(self.default_map)):
+            for x in range(len(self.default_map[y])):
+                if self.default_map[y, x] == 'S' and not circulated[y, x]:
+                    if self.default_map[c(y + 1), c(x)] == 'P' \
+                            and self.default_map[c(y - 1), c(x)] == 'S' \
+                            and self.default_map[c(y - 2), c(x)] == 'P':
+                        return {'x': x, 'y': y}, Directions.RIGHT
+                    elif self.default_map[c(y - 1), c(x)] == 'P' \
+                            and self.default_map[c(y + 1), c(x)] == 'S' \
+                            and self.default_map[c(y + 2), c(x)] == 'P':
+                        return {'x': x, 'y': y}, Directions.LEFT
+                    elif self.default_map[c(y), c(x + 1)] == 'P' \
+                            and self.default_map[c(y), c(x - 1)] == 'S' \
+                            and self.default_map[c(y), c(x - 2)] == 'P':
+                        return {'x': x, 'y': y}, Directions.UP
+                    elif self.default_map[c(y), c(x - 1)] == 'P' \
+                            and self.default_map[c(y), c(x + 1)] == 'S' \
+                            and self.default_map[c(y), c(x + 2)] == 'P':
+                        return {'x': x, 'y': y}, Directions.DOWN
         return None, None
+
+    def circulate(self, candidate, start_dir, circulated, possible_dirs):
+        right_nb = look_way_ahead(candidate, resulting_dir(start_dir, Commands.CAR_INDEX_RIGHT))
+        front_nb = look_way_ahead(candidate, start_dir)
+        if self.default_map[right_nb['y'], right_nb['x']] != 'P':
+            main_dir = resulting_dir(start_dir, Commands.CAR_INDEX_RIGHT)
+        elif self.default_map[front_nb['y'], front_nb['x']] == 'P':
+            main_dir = resulting_dir(start_dir, Commands.CAR_INDEX_LEFT)
+        else:
+            main_dir = start_dir
+        circulated[candidate['y'], candidate['x']] = True
+        possible_dirs[candidate['y'], candidate['x']] = [
+            main_dir, resulting_dir(main_dir, Commands.CAR_INDEX_LEFT), Directions.NONE, Directions.NONE
+        ]
+        next_candidate = look_way_ahead(candidate, main_dir)
+        if not circulated[next_candidate['y'], next_candidate['x']]:
+            self.circulate(next_candidate, main_dir, circulated, possible_dirs)
+
+    def add_posible_direction(self, position, direction):
+        for i in range(4):
+            if self.possible_directions[position['y'], position['x'], i] == Directions.NONE:
+                self.possible_directions[position['y'], position['x'], i] = direction
+                break
 
     def drivable_map_with_cars(self, cars, car_id):
         drivable_map_with_cars = np.copy(self.drivable_map)
