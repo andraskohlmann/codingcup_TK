@@ -5,6 +5,8 @@ from visual import save_dir_map, save_poss_dir_map, save_speed_map
 
 
 def turn_dir(direction, desired_direction):
+    if direction == desired_direction:
+        return Commands.NO_OP
     if desired_direction == Directions.UP:
         if direction == Directions.RIGHT:
             return Commands.CAR_INDEX_LEFT
@@ -130,14 +132,14 @@ class Board:
             passenger_location = self.passenger_location
 
         stop_location = self.stop_location(passenger_location)
-        drivable_map_with_cars = self.drivable_map_with_obsticles(data['cars'], data['pedestrians'], data['request_id']['car_id'])
-        dir_map, visited = self.direction_map(drivable_map_with_cars, stop_location)
+        # drivable_map_with_cars = self.drivable_map_with_obsticles(data['cars'], data['pedestrians'], data['request_id']['car_id'])
+        dir_map, visited = self.direction_map(self.drivable_map, stop_location)
         # if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
         #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
         #     print(visited)
         speed_map = self.speed_map(dir_map, stop_location)
         # save_speed_map(speed_map, dir_map, data['request_id']['tick'])
-        command = self.strat(data, dir_map, speed_map, drivable_map_with_cars)
+        command = self.strat(data, dir_map, speed_map, self.drivable_map)
         return command
 
     def stop_location(self, passenger_location):
@@ -182,7 +184,7 @@ class Board:
                     visited[next_pos['y'], next_pos['x']] = param
                     direction_map[next_pos['y'], next_pos['x']] = desired_dir
 
-    def strat(self, data: dict, dir_map: np.array, speed_map: np.array, drivable_map_with_cars: np.array) -> Commands:
+    def strat(self, data: dict, dir_map: np.array, speed_map: np.array, drivable_map: np.array) -> Commands:
         car = [_ for _ in data['cars'] if _['id'] == 0][0]
         pos = car['pos']
         speed = car['speed']
@@ -209,10 +211,14 @@ class Board:
             data['cars'][0]['transported'])
         )
 
-        if desired_speed == 0 or (
+
+
+        if (
+            desired_speed < new_speed
+        ) or (
             new_speed == 1 and new_pos == pos and desired_dir != new_dir
         ) or (
-            not drivable_map_with_cars[newest_pos['y'], newest_pos['x']]
+            not drivable_map[newest_pos['y'], newest_pos['x']]
         ) or (
             dir_map[new_pos['y'], new_pos['x']] == opposite_dir(direction) and speed > 0
         ) or (
@@ -264,9 +270,9 @@ class Board:
                 counter = 0
                 for idx in range(left, right, 1):
                     x_idx, y_idx = self.transform_coord(direction, i, idx)
-                    if counter < 2:
+                    if counter < 4:
                         dir_speed_map[x_idx, y_idx] = 1
-                    elif counter < 5:
+                    elif counter < 7:
                         dir_speed_map[x_idx, y_idx] = 2
                     else:
                         dir_speed_map[x_idx, y_idx] = 3
