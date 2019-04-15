@@ -115,6 +115,7 @@ class Board:
         self.size_y, self.size_x = self.drivable_map.shape
 
         self.possible_directions = self.set_possible_directions()
+        self.passenger_location = None
         # save_poss_dir_map(self.possible_directions)
 
     def next_command(self, data: dict) -> Commands:
