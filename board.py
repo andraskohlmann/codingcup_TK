@@ -215,7 +215,7 @@ class Board:
             command = Commands.DECELERATION
         else:
             if desired_dir == new_dir:
-                if speed == 0 and prev_command != Commands.ACCELERATION:
+                if speed < desired_speed and prev_command != Commands.ACCELERATION:
                     command = Commands.ACCELERATION
                 else:
                     command = Commands.NO_OP
@@ -229,12 +229,12 @@ class Board:
 
     def speed_map(self, dir_map, stop_pos):
         # TODO: optmize and manage borders
-
+        speed_map = np.ones_like(self.drivable_map)
         left_map = self.speed_map_in_dir(dir_map, Directions.LEFT)
         right_map = self.speed_map_in_dir(dir_map, Directions.RIGHT)
         up_map = self.speed_map_in_dir(dir_map, Directions.UP)
         down_map = self.speed_map_in_dir(dir_map, Directions.DOWN)
-        speed_map = left_map + right_map + up_map + down_map
+        speed_map = np.maximum(speed_map, left_map + right_map + up_map + down_map)
 
         # print(dir_map)
         # print(speed_map)
