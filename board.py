@@ -238,12 +238,12 @@ class Board:
 
         # print(dir_map)
         # print(speed_map)
-        speed_map = self.drivable_map.copy()
+        # speed_map = self.drivable_map.copy()
         speed_map[stop_pos['y'], stop_pos['x']] = 0
         return speed_map
 
     def speed_map_in_dir(self, dir_map, direction):
-        dir_speed_map = np.ones_like(self.drivable_map)
+        dir_speed_map = np.zeros_like(self.drivable_map)
         max_speed = 1
 
         for i in range(60):
