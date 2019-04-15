@@ -20,7 +20,7 @@ class World:
             return command(self.game_id, self.tick, self.car_id, Commands.NO_OP)
 
         self.tick = data['request_id']['tick']
-        print(data)
+        # print(data)
         cmd = self.board.next_command(data)
         return command(self.game_id, self.tick, self.car_id, cmd)
 

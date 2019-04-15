@@ -120,19 +120,18 @@ class Board:
     def next_command(self, data: dict) -> Commands:
         our_car = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']][0]
         if 'passenger_id' in our_car:
-            passenger_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0][
-                'dest_pos']
+            passenger_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0]['dest_pos']
         else:
-            passenger_location = data['passengers'][0]['pos']
+            passenger_location = self.find_closest_passenger(data['passengers'], our_car['pos'])
         stop_location = self.stop_location(passenger_location)
-        drivable_map_with_cars = self.drivable_map_with_cars(data['cars'], data['request_id']['car_id'])
+        drivable_map_with_cars = self.drivable_map_with_obsticles(data['cars'], data['pedestrians'], data['request_id']['car_id'])
         dir_map, visited = self.direction_map(drivable_map_with_cars, stop_location)
         # save_dir_map(dir_map, data['request_id']['tick'])
-        if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
-                and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
-            print(visited)
+        # if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
+        #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
+        #     print(visited)
         speed_map = self.speed_map(dir_map, stop_location)
-        command = self.strat(data, dir_map, speed_map)
+        command = self.strat(data, dir_map, speed_map, drivable_map_with_cars)
         return command
 
     def stop_location(self, passenger_location):
@@ -150,7 +149,7 @@ class Board:
                 for nb_nb_dir in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
                     nb_nb_pos = look_way_ahead(nb_pos, nb_nb_dir)
                     if self.default_map[nb_nb_pos['y'], nb_nb_pos['x']] == 'S':
-                        # self.add_posible_direction(nb_nb_pos, opposite_dir(nb_nb_dir))
+                        self.add_posible_direction(nb_nb_pos, opposite_dir(nb_nb_dir))
                         self.add_posible_direction(nb_pos, nb_nb_dir)
                 return nb_pos
         return None
@@ -177,7 +176,7 @@ class Board:
                     visited[next_pos['y'], next_pos['x']] = param
                     direction_map[next_pos['y'], next_pos['x']] = desired_dir
 
-    def strat(self, data: dict, dir_map: np.array, speed_map: np.array) -> Commands:
+    def strat(self, data: dict, dir_map: np.array, speed_map: np.array, drivable_map_with_cars: np.array) -> Commands:
         car = [_ for _ in data['cars'] if _['id'] == 0][0]
         pos = car['pos']
         speed = car['speed']
@@ -198,9 +197,21 @@ class Board:
         print("Pos: {}, new pos {}, newest {}".format(pos, new_pos, newest_pos))
         print("Dir: {}, new dir {}, desired {}".format(direction, new_dir, desired_dir))
         print("Speed: {}, desired {}".format(speed, desired_speed))
-        print("Life: {}".format(data['cars'][0]['life']))
+        print("Life: {}, tick: {}, transp: {}".format(
+            data['cars'][0]['life'],
+            data['request_id']['tick'],
+            data['cars'][0]['transported'])
+        )
 
-        if desired_speed == 0:
+        if desired_speed == 0 or (
+            new_speed == 1 and new_pos == pos and desired_dir != new_dir
+        ) or (
+            not drivable_map_with_cars[newest_pos['y'], newest_pos['x']]
+        ) or (
+            dir_map[new_pos['y'], new_pos['x']] == opposite_dir(direction) and speed > 0
+        ) or (
+            dir_map[new_pos['y'], new_pos['x']] == opposite_dir(new_dir) and speed > 0
+        ):
             command = Commands.DECELERATION
         else:
             if desired_dir == new_dir:
@@ -211,8 +222,8 @@ class Board:
             else:
                 command = turn_dir(new_dir, desired_dir)
 
-        if self.default_map[newest_pos['y'], newest_pos['x']] in ['P', 'B']:
-            command = Commands.EMERGENCY_BRAKE
+        # if self.default_map[newest_pos['y'], newest_pos['x']] in ['P', 'B']:
+        #     command = Commands.EMERGENCY_BRAKE
 
         return command
 
@@ -247,7 +258,8 @@ class Board:
 
         return dir_speed_map
 
-    def transform_coord(self, direction, x, y):
+    @staticmethod
+    def transform_coord(direction, x, y):
         if direction == Directions.LEFT:
             return x, y
         if direction == Directions.RIGHT:
@@ -257,7 +269,8 @@ class Board:
         if direction == Directions.DOWN:
             return 59 - y, x
 
-    def get_indices(self, visited, iter):
+    @staticmethod
+    def get_indices(visited, iter):
         indices = []
         for i, row in enumerate(visited):
             for j, col in enumerate(row):
@@ -322,8 +335,8 @@ class Board:
                 self.possible_directions[position['y'], position['x'], i] = direction
                 break
 
-    def drivable_map_with_cars(self, cars, car_id):
-        drivable_map_with_cars = np.copy(self.drivable_map)
+    def drivable_map_with_obsticles(self, cars, peds, car_id):
+        drivable_map_with_obsticles = np.copy(self.drivable_map)
         for car in cars:
             if car['id'] is not car_id:
                 future_car_pos, future_car_dir, future_car_speed = look_ahead(car['pos'], Directions[car['direction']],
@@ -331,10 +344,18 @@ class Board:
                 very_future_car_pos = look_way_ahead(future_car_pos, future_car_dir, future_car_speed)
                 positions = self.get_positions_between(future_car_pos, very_future_car_pos)
                 for pos in positions:
-                    drivable_map_with_cars[pos['y']][pos['x']] = 0
-        return drivable_map_with_cars
+                    drivable_map_with_obsticles[pos['y']][pos['x']] = 0
+        for ped in peds:
+            future_ped_pos, future_ped_dir, future_ped_speed = look_ahead(ped['pos'], Directions[ped['direction']],
+                                                                          ped['speed'], str_to_cmd[ped['command']])
+            very_future_ped_pos = look_way_ahead(future_ped_pos, future_ped_dir, future_ped_speed)
+            positions = self.get_positions_between(future_ped_pos, very_future_ped_pos)
+            for pos in positions:
+                drivable_map_with_obsticles[pos['y']][pos['x']] = 0
+        return drivable_map_with_obsticles
 
-    def get_positions_between(self, pos, new_pos):
+    @staticmethod
+    def get_positions_between(pos, new_pos):
         if pos == new_pos:
             return [pos]
 
@@ -349,6 +370,20 @@ class Board:
                 positions.append({'x': x, 'y': pos['y']})
         return positions
 
+    @staticmethod
+    def find_closest_passenger(passengers, our_pos):
+        min_dist = 120
+        pos = None
+        for passenger in passengers:
+            dist_x = abs(passenger['pos']['x'] - our_pos['x'])
+            dist_x = min(dist_x, 60 - dist_x)
+            dist_y = abs(passenger['pos']['y'] - our_pos['y'])
+            dist_y = min(dist_y, 60 - dist_y)
+            man_dist = dist_x + dist_y
+            if man_dist < min_dist:
+                min_dist = man_dist
+                pos = passenger['pos']
+        return pos
 
 def def_map():
     return np.array([
