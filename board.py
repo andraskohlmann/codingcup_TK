@@ -130,7 +130,7 @@ class Board:
         #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
         #     print(visited)
         speed_map = self.speed_map(dir_map, stop_location)
-        save_speed_map(speed_map, dir_map, data['request_id']['tick'])
+        # save_speed_map(speed_map, dir_map, data['request_id']['tick'])
         command = self.strat(data, dir_map, speed_map, drivable_map_with_cars)
         return command
 
