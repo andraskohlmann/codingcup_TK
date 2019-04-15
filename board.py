@@ -120,9 +120,14 @@ class Board:
     def next_command(self, data: dict) -> Commands:
         our_car = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']][0]
         if 'passenger_id' in our_car:
+            self.passenger_location = None
             passenger_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0]['dest_pos']
+        elif self.passenger_location is None:
+            self.passenger_location = self.find_closest_passenger(data['passengers'], our_car['pos'])
+            passenger_location = self.passenger_location
         else:
-            passenger_location = self.find_closest_passenger(data['passengers'], our_car['pos'])
+            passenger_location = self.passenger_location
+
         stop_location = self.stop_location(passenger_location)
         drivable_map_with_cars = self.drivable_map_with_obsticles(data['cars'], data['pedestrians'], data['request_id']['car_id'])
         dir_map, visited = self.direction_map(drivable_map_with_cars, stop_location)
@@ -130,7 +135,7 @@ class Board:
         #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
         #     print(visited)
         speed_map = self.speed_map(dir_map, stop_location)
-        # save_speed_map(speed_map, dir_map, data['request_id']['tick'])
+        save_speed_map(speed_map, dir_map, data['request_id']['tick'])
         command = self.strat(data, dir_map, speed_map, drivable_map_with_cars)
         return command
 
