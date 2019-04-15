@@ -243,18 +243,39 @@ class Board:
         return speed_map
 
     def speed_map_in_dir(self, dir_map, direction):
-        dir_speed_map = np.zeros_like(self.drivable_map)
+        dir_speed_map = np.ones_like(self.drivable_map)
         max_speed = 1
 
         for i in range(60):
-            for j in range(60):
-                x, y = self.transform_coord(direction, i, j)
-                if dir_map[x, y] == direction:
-                    dir_speed_map[x, y] = max_speed
-                    max_speed = max_speed + 1 if max_speed < 3 else 3
-                else:
-                    max_speed = 1
-            max_speed = 1
+            left = 0
+            right = 0
+            while left < 59 and right < 59:
+                x, y = self.transform_coord(direction, i, right)
+                while right < 59 and dir_map[x, y] == direction:
+                    right += 1
+                    x, y = self.transform_coord(direction, i, right)
+                # print(direction, left, right, x, y)
+                counter = 0
+                for idx in range(right - 1, left - 1, -1):
+                    if counter < 2:
+                        dir_speed_map[x, idx] = 1
+                    elif counter < 5:
+                        dir_speed_map[x, idx] = 2
+                    else:
+                        dir_speed_map[x, idx] = 3
+                    counter += 1
+
+                left = right + 1
+                right = left
+            #
+            # for j in range(60):
+            #     x, y = self.transform_coord(direction, i, j)
+            #     if dir_map[x, y] == direction:
+            #         dir_speed_map[x, y] = max_speed
+            #         max_speed = max_speed + 1 if max_speed < 3 else 3
+            #     else:
+            #         max_speed = 1
+            # max_speed = 1
 
         return dir_speed_map
 
