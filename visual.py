@@ -33,6 +33,14 @@ def save_dir_map(dir_map, tick):
     cv2.imwrite('out/{}.jpg'.format(tick), img)
 
 
+def save_speed_map(speed_map, dir_map, tick):
+    img = np.zeros((600, 600))
+    for i in range(len(speed_map)):
+        for j in range(len(speed_map[i])):
+            img[i*10:i*10 + 10, j*10:j*10 + 10] = patches[dir_map[i, j]] * 255 / 3 * speed_map[i, j]
+    cv2.imwrite('out/{}.jpg'.format(tick), img)
+
+
 def save_poss_dir_map(dir_map):
     img = np.zeros((600, 600))
     for i in range(len(dir_map)):

@@ -1,7 +1,7 @@
 import numpy as np
 
 from utils import Commands, Directions, str_to_cmd, c
-from visual import save_dir_map, save_poss_dir_map
+from visual import save_dir_map, save_poss_dir_map, save_speed_map
 
 
 def turn_dir(direction, desired_direction):
@@ -126,11 +126,11 @@ class Board:
         stop_location = self.stop_location(passenger_location)
         drivable_map_with_cars = self.drivable_map_with_obsticles(data['cars'], data['pedestrians'], data['request_id']['car_id'])
         dir_map, visited = self.direction_map(drivable_map_with_cars, stop_location)
-        # save_dir_map(dir_map, data['request_id']['tick'])
         # if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
         #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
         #     print(visited)
         speed_map = self.speed_map(dir_map, stop_location)
+        save_speed_map(speed_map, dir_map, data['request_id']['tick'])
         command = self.strat(data, dir_map, speed_map, drivable_map_with_cars)
         return command
 
@@ -256,13 +256,14 @@ class Board:
                     x, y = self.transform_coord(direction, i, right)
                 # print(direction, left, right, x, y)
                 counter = 0
-                for idx in range(right - 1, left - 1, -1):
+                for idx in range(left, right, 1):
+                    x_idx, y_idx = self.transform_coord(direction, i, idx)
                     if counter < 2:
-                        dir_speed_map[x, idx] = 1
+                        dir_speed_map[x_idx, y_idx] = 1
                     elif counter < 5:
-                        dir_speed_map[x, idx] = 2
+                        dir_speed_map[x_idx, y_idx] = 2
                     else:
-                        dir_speed_map[x, idx] = 3
+                        dir_speed_map[x_idx, y_idx] = 3
                     counter += 1
 
                 left = right + 1
