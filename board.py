@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import Commands, Directions, str_to_cmd, c
+from utils import Commands, Directions, Trains, str_to_cmd, c
 from visual import save_dir_map, save_poss_dir_map, save_speed_map
 
 
@@ -289,6 +289,69 @@ class Board:
             # max_speed = 1
 
         return dir_speed_map
+
+    def train_speed_mask(self, train, position):
+        mask = 3 * np.ones_like(self.default_map)
+
+        if position == -1:
+            return mask
+
+        fix_train_positions = {
+            Trains.NORTH: 5,
+            Trains.SOUTH: 54,
+            Trains.WEST: 5,
+            Trains.EAST: 54
+        }
+
+        train_directions = {
+            Trains.NORTH: Directions.RIGHT,
+            Trains.SOUTH: Directions.LEFT,
+            Trains.WEST: Directions.UP,
+            Trains.EAST: Directions.DOWN
+        }
+
+        train_length = 7
+        train_future = 9
+
+        if train_directions[train] in [Directions.UP, Directions.LEFT]:
+            train_head = min(position - train_future, 0)
+            train_tail = max(position + train_length, 59)
+        else:
+            train_head = min(position + train_future, 59)
+            train_tail = max(position - train_length, 0)
+
+        zeros = 2
+        ones = zeros + 1
+        twos = ones + 1
+
+        # TODO
+        was_grass_n = False
+        was_grass_p = False
+
+        for i in range(train_tail, train_head):
+            if train in [Trains.NORTH, Trains.SOUTH] and self.default_map[i, position] == 'X'\
+                    or train in [Trains.WEST, Trains.EAST] and self.default_map[position, i] == 'X':
+
+                fix_pos = fix_train_positions[train]
+                for j in range(zeros):
+                    Board.set_adjacents_for_train_mask(mask, train, fix_pos, i, j, 0)
+
+                for j in range(zeros, zeros + ones):
+                    Board.set_adjacents_for_train_mask(mask, train, fix_pos, i, j, 1)
+
+                for j in range(zeros + ones, zeros + ones + twos):
+                    Board.set_adjacents_for_train_mask(mask, train, fix_pos, i, j, 2)
+
+            return mask
+
+    @staticmethod
+    def set_adjacents_for_train_mask(mask, train, fix_pos, dyn_pos, distance, speed):
+        if train in [Trains.NORTH, Trains.SOUTH]:
+            mask[(fix_pos - distance) % 60, dyn_pos] = speed
+            mask[(fix_pos + distance) % 60, dyn_pos] = speed
+        else:
+            mask[dyn_pos, (fix_pos - distance) % 60] = speed
+            mask[dyn_pos, (fix_pos + distance) % 60] = speed
 
     @staticmethod
     def transform_coord(direction, x, y):

@@ -37,6 +37,12 @@ class Directions(Enum):
     LEFT = '<'
     NONE = '-'
 
+class Trains(Enum):
+    NORTH = 'n'
+    SOUTH = 's'
+    WEST = 'w'
+    EAST = 'e'
+
 
 def command(game_id, tick, car_id, cmd: Commands):
     msg = {
