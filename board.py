@@ -110,6 +110,10 @@ class Board:
     def __init__(self):
         default_map = def_map()
         self.default_map = np.array([[c for c in _] for _ in default_map])
+        self.default_map[self.default_map == 'X'] = 'S'
+        self.default_map[self.default_map == 'C'] = 'P'
+        self.default_map[self.default_map == 'R'] = 'B'
+        self.default_map[self.default_map == 'T'] = 'B'
         self.drivable_map = np.zeros_like(self.default_map, dtype=int)
         self.drivable_map[self.default_map == 'S'] = 1
         self.drivable_map[self.default_map == 'Z'] = 1
@@ -118,22 +122,38 @@ class Board:
 
         self.possible_directions = self.set_possible_directions()
         self.passenger_location = None
+        self.default_dir_map = None
+        self.tick = 0
         # save_poss_dir_map(self.possible_directions)
 
+        self.buffered_maps = 0
+
     def next_command(self, data: dict) -> Commands:
+        self.tick = data['request_id']['tick']
+        changed = False
         our_car = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']][0]
         if 'passenger_id' in our_car:
+            if self.passenger_location is not None:
+                changed = True
             self.passenger_location = None
-            passenger_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0]['dest_pos']
+            target_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0]['dest_pos']
         elif self.passenger_location is None:
             self.passenger_location = self.find_closest_passenger(data['passengers'], our_car['pos'])
-            passenger_location = self.passenger_location
+            changed = True
+            target_location = self.passenger_location
         else:
-            passenger_location = self.passenger_location
+            target_location = self.passenger_location
 
-        stop_location = self.stop_location(passenger_location)
+        stop_location = self.stop_location(target_location)
         # drivable_map_with_cars = self.drivable_map_with_obsticles(data['cars'], data['pedestrians'], data['request_id']['car_id'])
-        dir_map, visited = self.direction_map(self.drivable_map, stop_location)
+        if len(data['cars']) > 1 or len(data['pedestrians']) > 0:
+            changed = True
+
+        if changed:
+            self.default_dir_map, _ = self.direction_map(self.drivable_map, stop_location)
+        else:
+            self.buffered_maps += 1
+        dir_map = self.default_dir_map
         # if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
         #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
         #     print(visited)
@@ -205,10 +225,11 @@ class Board:
         print("Pos: {}, new pos {}, newest {}".format(pos, new_pos, newest_pos))
         print("Dir: {}, new dir {}, desired {}".format(direction, new_dir, desired_dir))
         print("Speed: {}, desired {}".format(speed, desired_speed))
-        print("Life: {}, tick: {}, transp: {}".format(
+        print("Life: {}, tick: {}, transp: {}, buffered maps = {}".format(
             data['cars'][0]['life'],
             data['request_id']['tick'],
-            data['cars'][0]['transported'])
+            data['cars'][0]['transported'],
+            self.buffered_maps)
         )
 
         if (
@@ -250,7 +271,29 @@ class Board:
         # print(speed_map)
         # speed_map = self.drivable_map.copy()
         speed_map[stop_pos['y'], stop_pos['x']] = 0
+
+        # for direction in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
+        #     speed_map = np.maximum(speed_map, self.train_speed_mask(
+        #         direction, self.train_position(direction, self.tick)
+        #     ))
+
         return speed_map
+
+    @staticmethod
+    def train_position(direction: Directions, tick: int):
+        mod_tick = tick % 50
+        dist = -1
+        ticks = {
+            Directions.UP: [2, 24, 1, 3],
+            Directions.DOWN: [2, 24, 58, -3],
+            Directions.LEFT: [27, 49, 58, -3],
+            Directions.RIGHT: [27, 49, 1, 3]
+        }
+        right_ticks = ticks[direction]
+        if right_ticks[0] <= mod_tick <= right_ticks[1]:
+            dist = max(min(right_ticks[2] + (mod_tick - right_ticks[0]) * right_ticks[3], 59), 0)
+        return dist
+
 
     def speed_map_in_dir(self, dir_map, direction):
         dir_speed_map = np.zeros_like(self.drivable_map)
@@ -388,21 +431,21 @@ class Board:
     def get_unvisited_road(self, circulated):
         for y in range(len(self.default_map)):
             for x in range(len(self.default_map[y])):
-                if self.default_map[y, x] == 'S' and not circulated[y, x]:
+                if self.default_map[y, x] in ['S', 'X'] and not circulated[y, x]:
                     if self.default_map[c(y + 1), c(x)] in ['P', 'G'] \
-                            and self.default_map[c(y - 1), c(x)] == 'S' \
+                            and self.default_map[c(y - 1), c(x)] in ['S', 'X'] \
                             and self.default_map[c(y - 2), c(x)] in ['P', 'G']:
                         return {'x': x, 'y': y}, Directions.RIGHT
                     elif self.default_map[c(y - 1), c(x)] in ['P', 'G'] \
-                            and self.default_map[c(y + 1), c(x)] == 'S' \
+                            and self.default_map[c(y + 1), c(x)] in ['S', 'X'] \
                             and self.default_map[c(y + 2), c(x)] in ['P', 'G']:
                         return {'x': x, 'y': y}, Directions.LEFT
                     elif self.default_map[c(y), c(x + 1)] in ['P', 'G'] \
-                            and self.default_map[c(y), c(x - 1)] == 'S' \
+                            and self.default_map[c(y), c(x - 1)] in ['S', 'X'] \
                             and self.default_map[c(y), c(x - 2)] in ['P', 'G']:
                         return {'x': x, 'y': y}, Directions.UP
                     elif self.default_map[c(y), c(x - 1)] in ['P', 'G'] \
-                            and self.default_map[c(y), c(x + 1)] == 'S' \
+                            and self.default_map[c(y), c(x + 1)] in ['S', 'X'] \
                             and self.default_map[c(y), c(x + 2)] in ['P', 'G']:
                         return {'x': x, 'y': y}, Directions.DOWN
         return None, None
