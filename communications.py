@@ -1,7 +1,7 @@
 import json
 import socket
 
-SERVER_IP = '31.46.64.35'
+SERVER_IP = '10.100.1.150'
 SERVER_PORT = 12323
 BUFFER_SIZE = 1024
 
