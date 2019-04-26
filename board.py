@@ -375,7 +375,7 @@ class Board:
         was_grass_p = False
 
         fix_pos = fix_train_positions[train]
-        for i in range(train_tail, train_head):
+        for i in range(train_tail, train_head, 1 if train_head > train_tail else -1):
             if ((train in [Trains.NORTH, Trains.SOUTH]) and self.default_map[fix_pos, i] == 'S')\
                     or ((train in [Trains.WEST, Trains.EAST]) and self.default_map[i, fix_pos] == 'S'):
 
