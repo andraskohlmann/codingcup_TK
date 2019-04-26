@@ -1,7 +1,7 @@
 import numpy as np
 
 from utils import Commands, Directions, Trains, str_to_cmd, c
-from visual import save_dir_map, save_poss_dir_map, save_speed_map
+from visual import save_dir_map, save_poss_dir_map, save_speed_map, save_only_speed_map
 
 
 def turn_dir(direction, desired_direction):
@@ -131,7 +131,9 @@ class Board:
     def next_command(self, data: dict) -> Commands:
         self.tick = data['request_id']['tick']
         changed = False
-        our_car = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']][0]
+        our_cars = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']]
+        if len(our_cars) == 0: return Commands.NO_OP
+        else: our_car = our_cars[0]
         if 'passenger_id' in our_car:
             if self.passenger_location is not None:
                 changed = True
@@ -158,7 +160,7 @@ class Board:
         #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
         #     print(visited)
         speed_map = self.speed_map(dir_map, stop_location)
-        # save_speed_map(speed_map, dir_map, data['request_id']['tick'])
+        save_speed_map(speed_map, dir_map, data['request_id']['tick'])
         command = self.strat(data, dir_map, speed_map, self.drivable_map)
         return command
 
@@ -205,7 +207,7 @@ class Board:
                     direction_map[next_pos['y'], next_pos['x']] = desired_dir
 
     def strat(self, data: dict, dir_map: np.array, speed_map: np.array, drivable_map: np.array) -> Commands:
-        car = [_ for _ in data['cars'] if _['id'] == 0][0]
+        car = [_ for _ in data['cars'] if _['id'] == data['request_id']['car_id']][0]
         pos = car['pos']
         speed = car['speed']
         direction = Directions[car['direction']]
@@ -226,9 +228,9 @@ class Board:
         print("Dir: {}, new dir {}, desired {}".format(direction, new_dir, desired_dir))
         print("Speed: {}, desired {}".format(speed, desired_speed))
         print("Life: {}, tick: {}, transp: {}, buffered maps = {}".format(
-            data['cars'][0]['life'],
+            car['life'],
             data['request_id']['tick'],
-            data['cars'][0]['transported'],
+            car['transported'],
             self.buffered_maps)
         )
 
@@ -272,24 +274,25 @@ class Board:
         # speed_map = self.drivable_map.copy()
         speed_map[stop_pos['y'], stop_pos['x']] = 0
 
-        # for direction in [Directions.DOWN, Directions.UP, Directions.RIGHT, Directions.LEFT]:
-        #     speed_map = np.maximum(speed_map, self.train_speed_mask(
-        #         direction, self.train_position(direction, self.tick)
-        #     ))
+        for train in [Trains.NORTH, Trains.SOUTH, Trains.EAST, Trains.WEST]:
+            train_mask = self.train_speed_mask(train, self.train_position(train, self.tick))
+            speed_map = np.minimum(speed_map, train_mask)
+            # if train == Trains.NORTH:
+            #     save_only_speed_map(train_mask, self.tick)
 
         return speed_map
 
     @staticmethod
-    def train_position(direction: Directions, tick: int):
+    def train_position(train: Trains, tick: int):
         mod_tick = tick % 50
         dist = -1
         ticks = {
-            Directions.UP: [2, 24, 1, 3],
-            Directions.DOWN: [2, 24, 58, -3],
-            Directions.LEFT: [27, 49, 58, -3],
-            Directions.RIGHT: [27, 49, 1, 3]
+            Trains.NORTH: [2, 24, 1, 3],
+            Trains.SOUTH: [2, 24, 58, -3],
+            Trains.WEST: [27, 49, 58, -3],
+            Trains.EAST: [27, 49, 1, 3]
         }
-        right_ticks = ticks[direction]
+        right_ticks = ticks[train]
         if right_ticks[0] <= mod_tick <= right_ticks[1]:
             dist = max(min(right_ticks[2] + (mod_tick - right_ticks[0]) * right_ticks[3], 59), 0)
         return dist
@@ -334,7 +337,7 @@ class Board:
         return dir_speed_map
 
     def train_speed_mask(self, train, position):
-        mask = 3 * np.ones_like(self.default_map)
+        mask = np.ones_like(self.default_map, dtype=int) * 3
 
         if position == -1:
             return mask
@@ -357,8 +360,8 @@ class Board:
         train_future = 9
 
         if train_directions[train] in [Directions.UP, Directions.LEFT]:
-            train_head = min(position - train_future, 0)
-            train_tail = max(position + train_length, 59)
+            train_head = max(position - train_future, 0)
+            train_tail = min(position + train_length, 59)
         else:
             train_head = min(position + train_future, 59)
             train_tail = max(position - train_length, 0)
@@ -371,11 +374,11 @@ class Board:
         was_grass_n = False
         was_grass_p = False
 
+        fix_pos = fix_train_positions[train]
         for i in range(train_tail, train_head):
-            if train in [Trains.NORTH, Trains.SOUTH] and self.default_map[i, position] == 'X'\
-                    or train in [Trains.WEST, Trains.EAST] and self.default_map[position, i] == 'X':
+            if ((train in [Trains.NORTH, Trains.SOUTH]) and self.default_map[fix_pos, i] == 'S')\
+                    or ((train in [Trains.WEST, Trains.EAST]) and self.default_map[i, fix_pos] == 'S'):
 
-                fix_pos = fix_train_positions[train]
                 for j in range(zeros):
                     Board.set_adjacents_for_train_mask(mask, train, fix_pos, i, j, 0)
 
@@ -384,8 +387,7 @@ class Board:
 
                 for j in range(zeros + ones, zeros + ones + twos):
                     Board.set_adjacents_for_train_mask(mask, train, fix_pos, i, j, 2)
-
-            return mask
+        return mask
 
     @staticmethod
     def set_adjacents_for_train_mask(mask, train, fix_pos, dyn_pos, distance, speed):

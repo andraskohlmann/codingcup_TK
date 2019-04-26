@@ -15,9 +15,9 @@ class World:
         if self.car_id is None:
             self.car_id = data['request_id']['car_id']
 
-        # if self.tick == data['request_id']['tick']:
-        #     print("NO_OP SENT")
-        #     return command(self.game_id, self.tick, self.car_id, Commands.NO_OP)
+        if self.tick == data['request_id']['tick']:
+            print("NO_OP SENT")
+            return command(self.game_id, self.tick, self.car_id, Commands.NO_OP)
 
         self.tick = data['request_id']['tick']
         print(data)

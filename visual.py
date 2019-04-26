@@ -16,12 +16,26 @@ p_up = np.array([
     [1,1,1,1,1,1,1,1,1,1]
 ])
 
+s_up = np.array([
+    [1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,1,1,0,0,0,1],
+    [1,0,0,1,1,1,1,0,0,1],
+    [1,0,0,1,1,1,1,0,0,1],
+    [1,0,0,0,1,1,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1]
+])
+
 patches = {
     Directions.UP: p_up,
     Directions.DOWN: p_up[::-1, :],
     Directions.RIGHT: p_up.transpose()[:, ::-1],
     Directions.LEFT: p_up.transpose(),
-    Directions.NONE: np.zeros_like(p_up)
+    Directions.NONE: np.zeros_like(p_up),
+    'speed': s_up
 }
 
 
@@ -38,6 +52,14 @@ def save_speed_map(speed_map, dir_map, tick):
     for i in range(len(speed_map)):
         for j in range(len(speed_map[i])):
             img[i*10:i*10 + 10, j*10:j*10 + 10] = patches[dir_map[i, j]] * 255 / 3 * speed_map[i, j]
+    cv2.imwrite('out/{}.jpg'.format(tick), img)
+
+
+def save_only_speed_map(speed_map, tick):
+    img = np.zeros((600, 600))
+    for i in range(len(speed_map)):
+        for j in range(len(speed_map[i])):
+            img[i*10:i*10 + 10, j*10:j*10 + 10] = patches['speed'] * 255 / 3 * speed_map[i, j]
     cv2.imwrite('out/{}.jpg'.format(tick), img)
 
 

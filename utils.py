@@ -3,6 +3,7 @@ from enum import Enum
 
 def token():
     msg = {"token": "Xca2a9ZZM8k9IcXdR7UDRrYTdra3OxH7ud4PjbTlYqmXSkdb5PjaWQMQ0v0F5pYJl6SEH26zpFmHQ"}
+    # msg = {"token": "Xca2a9ZZM8k9IcXdR7UDRrYTdra3OxH7ud4PjbTlYqmXSkdb5PjaWQMQ0v0F5pYJl6SEH26zpFmHQ", "finale" : "asd"}
     return msg
 
 
