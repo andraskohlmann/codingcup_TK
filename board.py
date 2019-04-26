@@ -126,28 +126,33 @@ class Board:
         self.tick = 0
         # save_poss_dir_map(self.possible_directions)
 
+        self.buffered_maps = 0
+
     def next_command(self, data: dict) -> Commands:
         self.tick = data['request_id']['tick']
+        changed = False
         our_car = [c for c in data['cars'] if c['id'] == data['request_id']['car_id']][0]
         if 'passenger_id' in our_car:
-            # if self.passenger_location is None:
-            #     self.default_dir_map = None
+            if self.passenger_location is not None:
+                changed = True
             self.passenger_location = None
-            passenger_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0]['dest_pos']
+            target_location = [_ for _ in data['passengers'] if _['id'] == our_car['passenger_id']][0]['dest_pos']
         elif self.passenger_location is None:
             self.passenger_location = self.find_closest_passenger(data['passengers'], our_car['pos'])
-            # self.default_dir_map = None
-            passenger_location = self.passenger_location
+            changed = True
+            target_location = self.passenger_location
         else:
-            passenger_location = self.passenger_location
+            target_location = self.passenger_location
 
-        stop_location = self.stop_location(passenger_location)
+        stop_location = self.stop_location(target_location)
         # drivable_map_with_cars = self.drivable_map_with_obsticles(data['cars'], data['pedestrians'], data['request_id']['car_id'])
-        # if len(data['cars']) > 1 and len(data['pedestrians']) > 0:
-        #     dir_map, visited = self.direction_map(self.drivable_map, stop_location)
-        # else:
-        #     if self.default_dir_map is None:
-        self.default_dir_map, _ = self.direction_map(self.drivable_map, stop_location)
+        if len(data['cars']) > 1 or len(data['pedestrians']) > 0:
+            changed = True
+
+        if changed:
+            self.default_dir_map, _ = self.direction_map(self.drivable_map, stop_location)
+        else:
+            self.buffered_maps += 1
         dir_map = self.default_dir_map
         # if dir_map[our_car['pos']['y'], our_car['pos']['x']] == Directions.NONE \
         #         and self.default_map[our_car['pos']['y'], our_car['pos']['x']] == 'S':
@@ -220,10 +225,11 @@ class Board:
         print("Pos: {}, new pos {}, newest {}".format(pos, new_pos, newest_pos))
         print("Dir: {}, new dir {}, desired {}".format(direction, new_dir, desired_dir))
         print("Speed: {}, desired {}".format(speed, desired_speed))
-        print("Life: {}, tick: {}, transp: {}".format(
+        print("Life: {}, tick: {}, transp: {}, buffered maps = {}".format(
             data['cars'][0]['life'],
             data['request_id']['tick'],
-            data['cars'][0]['transported'])
+            data['cars'][0]['transported'],
+            self.buffered_maps)
         )
 
         if (
